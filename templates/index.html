@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Breast Density Detection</title>
+    <style>
+        body { font-family: Arial; text-align: center; background-color: #f5f5f5; }
+        .upload-box { margin: 20px; padding: 10px; background: white; display: inline-block; border-radius: 10px; }
+        img { width: 200px; height: auto; margin: 10px; border-radius: 10px; }
+        #results { display: flex; flex-wrap: wrap; justify-content: center; }
+        .card { background: #fff; padding: 15px; margin: 10px; border-radius: 10px; box-shadow: 0 0 5px rgba(0,0,0,0.2); width: 240px; }
+    </style>
+    <!-- External stylesheet (placed after the inline styles so the external rules can override them) -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h2>Breast Density Classification</h2>
+    <form id="uploadForm">
+        <div class="upload-box">
+            <label>LCC: </label><input type="file" name="LCC" accept="image/*" required><br>
+            <label>LMLO: </label><input type="file" name="LMLO" accept="image/*" required><br>
+            <label>RCC: </label><input type="file" name="RCC" accept="image/*" required><br>
+            <label>RMLO: </label><input type="file" name="RMLO" accept="image/*" required><br>
+        </div><br>
+        <button type="submit">Detect</button>
+    </form>
+
+    <div id="results"></div>
+
+    <script>
+    // When submitting, capture the local File objects so we can preview them
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const form = e.target;
+        const formData = new FormData(form);
+
+        // Map of view name -> File (so we can show a preview after the server responds)
+        const filesMap = {};
+        ['LCC','LMLO','RCC','RMLO'].forEach(key => {
+            const input = form.querySelector(`input[name="${key}"]`);
+            if (input && input.files && input.files[0]) filesMap[key] = input.files[0];
+        });
+
+        // Send files to server
+        const res = await fetch('/predict', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            alert('Server error: ' + text);
+            return;
+        }
+
+        const data = await res.json();
+        const resultsDiv = document.getElementById('results');
+        resultsDiv.innerHTML = '';
+
+        data.results.forEach(item => {
+            // Create card container
+            const card = document.createElement('div');
+            card.className = 'card';
+
+            // Title
+            const h3 = document.createElement('h3');
+            h3.textContent = item.view || '';
+            card.appendChild(h3);
+
+            // If we have the original file, create an image preview and append
+            const file = filesMap[item.view];
+            if (file) {
+                const img = document.createElement('img');
+                img.alt = item.view + ' preview';
+                img.src = URL.createObjectURL(file);
+                img.onload = () => URL.revokeObjectURL(img.src); // free memory when loaded
+                card.appendChild(img);
+            }
+
+            // Content (error or prediction details)
+            if (item.error) {
+                const p = document.createElement('p');
+                p.textContent = item.error;
+                card.appendChild(p);
+            } else {
+                const pPred = document.createElement('p');
+                pPred.innerHTML = `<b>Prediction:</b> ${item.label} (${item.prediction})`;
+                card.appendChild(pPred);
+
+                const pConf = document.createElement('p');
+                pConf.innerHTML = `<b>Confidence:</b> ${item.confidence}`;
+                card.appendChild(pConf);
+
+                const pTime = document.createElement('p');
+                pTime.innerHTML = `<b>Time:</b> ${item.time}`;
+                card.appendChild(pTime);
+            }
+
+            resultsDiv.appendChild(card);
+        });
+    });
+    </script>
+</body>
+</html>
