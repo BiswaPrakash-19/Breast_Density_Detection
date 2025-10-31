@@ -1,0 +1,1 @@
+An AI-powered web application for automatic breast density classification using the DeiT Vision Transformer model integrated with Flask. Upload mammogram images (LCC, LMLO, RCC, RMLO) to get real-time predictions, confidence scores, and visual results.
